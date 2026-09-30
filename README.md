@@ -19,6 +19,20 @@
 *The live console in mock-LLM mode: the first booking had already committed, the correction bumps the
 epoch, the stale booking is refunded by a compensating action, and exactly one new booking is made.*
 
+## Submission checklist
+
+| Item | Status | Where |
+|---|---|---|
+| Source code | ✅ | this repository: [chronos/](chronos/), [bench/](bench/), [scenarios/](scenarios/), [web/](web/), [tests/](tests/) |
+| Presentation | ✅ | [presentation/presentation.pptx](presentation/presentation.pptx) |
+| Video | ✅ | [▶ Watch the prototype demo video](https://drive.google.com/file/d/1XQ9rK0M7CXhwdTMsQRwWkcw7XGgWG09d/view?usp=sharing) |
+| AI disclosure | ✅ | [AI_DISCLOSURE.md](AI_DISCLOSURE.md) |
+| README | ✅ | this file |
+| APK / SDK | ➖ not applicable | CHRONOS is a Python service with a browser client (run it with `python scripts/tasks.py run` or Docker); there is no Android build or SDK package |
+| Tag | ✅ | release tag `v1.0.0`; hackathon tag: `Samsung PRISM GenAI Hackathon · Theme 05 · Team Zenera` |
+
+**Tags:** `samsung-prism` `generative-ai` `theme-05` `team-zenera` `interruptible-agent` `barge-in` `real-time` `asyncio` `fastapi` `ollama` `llama3` `moondream` `idempotency` `voice-agent`
+
 ## The problem
 
 Voice assistants are half-duplex: listen, think, speak, act, one step at a time. Interrupt one
