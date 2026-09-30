@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How CHRONOS works</title>
+<meta name="description" content="Architecture of CHRONOS: event queue, barge-in classifier, fast and slow paths, epochs, cancellation and the guarded write path.">
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+<header class="hero wrap">
+  <div class="eyebrow">Architecture</div>
+  <h1>Every interruption is a new epoch.</h1>
+  <p class="lede">A session has one integer, the epoch. Everything the agent starts (plans, tool calls, outputs) is stamped with it. When you correct, change goal or cancel, the epoch moves on and everything older is cancelled or dropped.</p>
+</header>
+
+<main>
+<section>
+  <div class="wrap">
+    <h2>The pipeline</h2>
+    <div class="diagram">
+      <svg viewBox="0 0 900 400" role="img" aria-label="CHRONOS architecture: events feed a priority queue, then perception, then a fast path and a slow path, both guarded by the coordination layer, then tools and output">
+        <defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="#aaa494"/></marker></defs>
+
+        <text class="lane" x="10" y="22">INPUT</text>
+        <rect class="node" x="10" y="34" width="150" height="62" rx="9"/><text x="24" y="60">Event sources</text><text class="sub" x="24" y="78">voice · text · camera · barge-in</text>
+        <rect class="node" x="210" y="34" width="150" height="62" rx="9"/><text x="224" y="60">Priority queue</text><text class="sub" x="224" y="78">interrupts first</text>
+
+        <text class="lane" x="410" y="22">PERCEPTION</text>
+        <rect class="node" x="410" y="34" width="210" height="62" rx="9"/><text x="424" y="56">Intent + barge-in classifier</text><text class="sub" x="424" y="74">rules &lt; 5 ms, LLM fallback w/ timeout</text>
+
+        <text class="lane" x="670" y="22">COORDINATION</text>
+        <rect class="node hot" x="670" y="34" width="220" height="62" rx="9"/><text x="684" y="56">Epoch manager</text><text class="sub" x="684" y="74">bump on correction · goal change · cancel</text>
+
+        <text class="lane" x="10" y="150">FAST PATH</text>
+        <rect class="node" x="10" y="162" width="200" height="70" rx="9"/><text x="24" y="188">Acknowledgement</text><text class="sub" x="24" y="206">template, no LLM, &lt; 300 ms</text><text class="sub" x="24" y="220">never claims “done” early</text>
+
+        <text class="lane" x="250" y="150">SLOW PATH</text>
+        <rect class="node" x="250" y="162" width="200" height="70" rx="9"/><text x="264" y="188">Speculative planner</text><text class="sub" x="264" y="206">Llama 3.2 3B · JSON mode</text><text class="sub" x="264" y="220">Moondream for camera frames</text>
+
+        <rect class="node hot" x="490" y="162" width="190" height="70" rx="9"/><text x="504" y="188">Cancellation + snapshots</text><text class="sub" x="504" y="206">stale tasks cancelled</text><text class="sub" x="504" y="220">late results dropped, logged</text>
+
+        <rect class="node hot" x="710" y="162" width="180" height="70" rx="9"/><text x="724" y="188">Idempotency ledger</text><text class="sub" x="724" y="206">sha256(session+tool+args)</text><text class="sub" x="724" y="220">SQLite, async-safe</text>
+
+        <text class="lane" x="250" y="290">TOOLS</text>
+        <rect class="node" x="250" y="302" width="200" height="62" rx="9"/><text x="264" y="328">Read tools (speculative)</text><text class="sub" x="264" y="346">cached per (tool, args)</text>
+        <rect class="node hot" x="490" y="302" width="200" height="62" rx="9"/><text x="504" y="328">Write tools (guarded)</text><text class="sub" x="504" y="346">committed · current epoch · ledger ok</text>
+
+        <text class="lane" x="10" y="290">OUTPUT</text>
+        <rect class="node" x="10" y="302" width="200" height="62" rx="9"/><text x="24" y="328">Protocol messages</text><text class="sub" x="24" y="346">ack · progress · response · result</text>
+
+        <path class="edge" d="M160 65H208" marker-end="url(#ar)"/>
+        <path class="edge" d="M360 65H408" marker-end="url(#ar)"/>
+        <path class="edge" d="M620 65H668" marker-end="url(#ar)"/>
+        <path class="edge" d="M780 96V160" marker-end="url(#ar)"/>
+        <path class="edge" d="M515 96V130H110V160" marker-end="url(#ar)"/>
+        <path class="edge" d="M515 96V130H350V160" marker-end="url(#ar)"/>
+        <path class="edge" d="M450 197H488" marker-end="url(#ar)"/>
+        <path class="edge hot" d="M350 232V300" marker-end="url(#ar)"/>
+        <path class="edge hot" d="M590 232V300" marker-end="url(#ar)"/>
+        <path class="edge" d="M490 333H212" marker-end="url(#ar)"/>
+        <path class="edge" d="M110 232V300" marker-end="url(#ar)"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>What happens when you interrupt</h2>
+    <ol class="steps">
+      <li><b>Classify in milliseconds.</b> Deterministic rules label the utterance as a correction, goal change, addition, cancel, backchannel, hesitation or question. Only if they are unsure does an LLM decide, with a hard timeout and a rule-based fallback.</li>
+      <li><b>Acknowledge instantly.</b> A template reply (“Got it, switching to the 6pm flight…”) goes out in under 300 ms with no LLM call. It never says something is booked before it is.</li>
+      <li><b>Bump the epoch</b> for corrections, goal changes and cancels. Backchannels (“uh-huh”) and hesitations (“um…”) do not bump it and do not interrupt.</li>
+      <li><b>Cancel the old epoch.</b> Its tasks are cancelled; any result that still arrives with an old epoch is dropped and logged, never shown.</li>
+      <li><b>Patch, don't restart.</b> An immutable snapshot of slots and plan per epoch lets a correction change one field (time: 8pm → 6pm) and reuse still-valid speculative reads.</li>
+      <li><b>Guard every write.</b> It runs only if the plan is committed, the epoch is still current (checked again just before dispatch), and the idempotency ledger has not seen the same write.</li>
+      <li><b>Compensate if it was too late.</b> A write that committed and then went stale is undone through the same ledger (for example a booking is cancelled and refunded).</li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Design choices worth knowing</h2>
+    <div class="grid g3">
+      <div class="card"><h3>Never freezes</h3><p>Every LLM call has a timeout and a deterministic fallback. With the mock LLM the whole system runs without Ollama.</p></div>
+      <div class="card"><h3>Stale writes are visible</h3><p>A write stopped by the fence is recorded as <code>BLOCKED</code>, distinct from a real <code>FAILED</code>, and can be retried later.</p></div>
+      <div class="card"><h3>Everything is traced</h3><p>Each component writes structured JSONL events with epochs and millisecond timestamps, rendered on the <a href="/timeline">Timeline</a>.</p></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer><div class="wrap">CHRONOS · Python 3.11, asyncio, FastAPI, Pydantic v2, structlog, aiosqlite · Ollama for local models.</div></footer>
+<script src="/assets/site.js"></script>
+</body>
+</html>

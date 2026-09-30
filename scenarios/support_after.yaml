@@ -1,0 +1,17 @@
+name: support_after
+title: "Customer support: change the flight after it is booked"
+description: >
+  The first booking is already committed. The correction cancels it through a
+  compensating action (same idempotency ledger) and books the new date.
+tool_latency_ms: [120, 320]
+steps:
+  - say: "Book a flight to Delhi tomorrow"
+  - wait_for_idle: true
+  - say: "Actually, next week instead"
+  - wait: 50
+  - say: "okay"   # a backchannel: traced and ignored
+expect:
+  epoch: 2
+  live: {bookings: 1, navigation: 0, reservations: 0}
+  charged: 1
+  ledger_status: [COMMITTED, COMPENSATED]

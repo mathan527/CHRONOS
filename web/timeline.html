@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CHRONOS timeline</title>
+<meta name="description" content="Swim-lane trace of a CHRONOS session: perception, fast, slow, coordination and tools, coloured by epoch.">
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+<header class="hero wrap" style="padding-bottom:1.5rem">
+  <div class="eyebrow">Trace timeline</div>
+  <h1>See what was cancelled.</h1>
+  <p class="lede">Each row is a component, each colour an epoch. Work cancelled by an interruption is struck through, and stale results show up as dropped, not delivered.</p>
+</header>
+
+<main class="wrap" style="padding-bottom:3rem">
+  <div class="tl-bar">
+    <label for="pick">Session</label>
+    <select id="pick" disabled><option>Loading…</option></select>
+    <a class="btn ghost" id="open" href="#" target="_blank" rel="noopener" hidden>Open full screen</a>
+    <a class="btn ghost" id="raw" href="#" target="_blank" rel="noopener" hidden>Raw JSONL</a>
+  </div>
+  <div class="empty" id="empty" hidden>No sessions yet. Run a scenario in the <a href="/demo">live demo</a>, then come back.</div>
+  <iframe class="tl" id="frame" title="Trace timeline" hidden></iframe>
+</main>
+
+<footer><div class="wrap">Traces are written to <code>traces/&lt;session&gt;.jsonl</code> by every component.</div></footer>
+<script src="/assets/site.js"></script>
+<script src="/assets/timeline.js"></script>
+</body>
+</html>

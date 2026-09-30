@@ -1,0 +1,14 @@
+name: access
+title: "Accessibility: hesitation, then a self-correction"
+description: >
+  "I want to boo... um..." is not acted on. The self-correction updates the
+  current task incrementally, and exactly one reservation is made.
+tool_latency_ms: [120, 320]
+steps:
+  - partial: "I want to boo…"
+  - wait: 50
+  - partial: "I want to boo… um…"
+  - wait: 50
+  - say: "actually, book a table for 4"
+expect:
+  live: {reservations: 1, bookings: 0, navigation: 0}

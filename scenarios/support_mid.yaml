@@ -1,0 +1,14 @@
+name: support_mid
+title: "Customer support: change the flight before it is booked"
+description: >
+  The correction lands while the search is running; the plan is patched and only
+  the corrected flight is booked. No double booking, no double charge.
+tool_latency_ms: [120, 320]
+steps:
+  - say: "Book a flight to Delhi tomorrow"
+  - wait: 60
+  - say: "Actually, next week instead"
+expect:
+  epoch: 2
+  live: {bookings: 1, navigation: 0, reservations: 0}
+  charged: 1

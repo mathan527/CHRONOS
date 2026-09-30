@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CHRONOS Trace Timeline</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg:#f3ebdd; --fg:#1b2838; --muted:#5e6a78; --line:#d3c6ab; --lane-alt:#efe6d4;
+    --bar-text:#faf5ea; --bad:#a83a1f; --good:#456a2c; --panel:#faf5ea;
+    --e0:#8a5a00; --e1:#2f5f7a; --e2:#a8481f; --e3:#456a2c;
+    --e4:#6b5b8a; --e5:#8a3f5c; --e6:#3f7a74; --e7:#5e6a78;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#141f2b; --fg:#f3ebdd; --muted:#c2bba9; --line:#34475f; --lane-alt:#1b2838;
+      --bar-text:#1b2838; --bad:#e0795f; --good:#9bb57f; --panel:#1b2838;
+      --e0:#d9a441; --e1:#8fb0c4; --e2:#d27a58; --e3:#9bb57f;
+      --e4:#b9a3d6; --e5:#d68fa8; --e6:#7fc0b8; --e7:#a9b3bf;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.45 system-ui, sans-serif; }
+  header { padding:12px 16px 8px; border-bottom:1px solid var(--line); background:var(--panel); }
+  h1 { font-size:16px; margin:0 0 2px; }
+  #sub { color:var(--muted); font-size:12px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; margin-top:8px; }
+  button, label.btn { font:inherit; color:var(--fg); background:var(--bg); border:1px solid var(--line);
+    border-radius:6px; padding:3px 10px; cursor:pointer; }
+  button:hover, label.btn:hover { border-color:var(--muted); }
+  input[type=file] { display:none; }
+  .chip { display:inline-flex; gap:5px; align-items:center; padding:1px 8px; border:1px solid var(--line);
+    border-radius:99px; background:var(--bg); font-size:12px; white-space:nowrap; }
+  .chip b { font-weight:600; }
+  .chip.bad { border-color:var(--bad); color:var(--bad); }
+  .chip.good { border-color:var(--good); color:var(--good); }
+  .sw { width:11px; height:11px; border-radius:3px; display:inline-block; }
+  #warn { color:var(--bad); font-size:12px; margin-top:6px; display:none; }
+  #scroll { display:flex; overflow-x:auto; border-bottom:1px solid var(--line); }
+  #labels { position:sticky; left:0; z-index:2; flex:none; background:var(--bg); }
+  #chart { flex:none; display:block; }
+  svg text { font:11px system-ui, sans-serif; fill:var(--fg); }
+  svg .axis text, svg .muted { fill:var(--muted); }
+  svg .lane-label { font-weight:600; font-size:12px; }
+  svg .hit { cursor:default; }
+  svg .hit:hover { filter:brightness(1.15); }
+  #tip { position:fixed; z-index:10; display:none; max-width:min(560px, 92vw); max-height:60vh; overflow:auto;
+    background:var(--panel); color:var(--fg); border:1px solid var(--muted); border-radius:6px;
+    padding:8px 10px; font:11px/1.35 ui-monospace, Consolas, monospace; white-space:pre-wrap;
+    pointer-events:none; box-shadow:0 4px 16px rgba(0,0,0,.25); }
+  #drop { position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center;
+    background:color-mix(in srgb, var(--bg) 88%, transparent); font-size:18px; color:var(--muted);
+    border:3px dashed var(--muted); margin:10px; border-radius:12px; }
+  #empty { padding:60px 16px; text-align:center; color:var(--muted); }
+  #legend { padding:8px 16px 16px; color:var(--muted); font-size:12px; display:flex; flex-wrap:wrap; gap:6px 16px; }
+  @media (max-width:640px) { header { padding:10px 12px 6px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>CHRONOS trace timeline</h1>
+  <div id="sub">Swim lanes per component. X axis = milliseconds since session start. Colour = epoch.</div>
+  <div class="row">
+    <label class="btn" for="file">Open trace file&hellip;</label>
+    <input id="file" type="file" accept=".jsonl,.ndjson,.json,.txt">
+    <button id="zout" title="Zoom out">&minus;</button>
+    <button id="zin" title="Zoom in">+</button>
+    <button id="fit" title="Fit whole session to the window">Fit</button>
+    <label id="livewrap" style="display:none"><input id="live" type="checkbox"> live refresh</label>
+    <span id="src" class="muted" style="color:var(--muted)"></span>
+  </div>
+  <div class="row" id="summary"></div>
+  <div class="row" id="epochs"></div>
+  <div id="warn"></div>
+</header>
+<div id="empty" style="display:none">Drop a <code>traces/&lt;session&gt;.jsonl</code> file anywhere on this page, or use &ldquo;Open trace file&rdquo;.</div>
+<div id="scroll" style="display:none"><svg id="labels"></svg><svg id="chart"></svg></div>
+<div id="legend"></div>
+<div id="tip"></div>
+<div id="drop">Drop the .jsonl trace to load it</div>
+
+<script id="model">
+/* ------------------------------------------------------------------------------------------
+   Model: pure functions, no DOM. Turns raw trace rows into lanes / spans / marks / epoch bumps.
+   ------------------------------------------------------------------------------------------ */
+const LANES = [
+  { id: "perception",   label: "Perception" },
+  { id: "fast",         label: "Fast path" },
+  { id: "slow",         label: "Slow path" },
+  { id: "coordination", label: "Coordination" },
+  { id: "tools",        label: "Tools" },
+];
+const LANE_IDS = new Set(LANES.map(l => l.id));
+// Ledger events are emitted by the coordination layer but are about tool writes.
+const LANE_OVERRIDE = { write_committed: "tools", write_blocked_duplicate: "tools",
+                        write_blocked: "tools", write_compensated: "tools" };
+const MARK_KIND = {
+  event_received: "event", response_sent: "response", stale_result_dropped: "stale",
+  write_blocked_duplicate: "duplicate", write_blocked: "blocked", write_committed: "commit",
+  write_compensated: "comp", plan_drafted: "plan", plan_patched: "plan", plan_committed: "plan",
+  plan_cancelled: "plan", task_protected: "protect", read_reused: "reuse", read_carried_over: "reuse",
+};
+const ACK_BUDGET_MS = 300;
+
+function parseJsonl(text) {
+  const rows = []; let bad = 0;
+  for (const line of String(text).split(/\r?\n/)) {
+    const s = line.trim();
+    if (!s) continue;
+    try { const o = JSON.parse(s); if (o && typeof o === "object" && !Array.isArray(o)) rows.push(o); else bad++; }
+    catch (e) { bad++; }
+  }
+  return { rows, bad };
+}
+
+function laneOfTask(name) { return /^(read:|write:|compensate)/.test(name || "") ? "tools" : "slow"; }
+
+function buildModel(rowsIn) {
+  const rows = rowsIn
+    .filter(r => r && typeof r.t_ms === "number" && typeof r.event === "string")
+    .map((r, i) => ({ r, i }))
+    .sort((a, b) => a.r.t_ms - b.r.t_ms || a.i - b.i)
+    .map(x => x.r);
+  const spans = [], marks = [], bumps = [];
+  const open = new Map();                     // task key -> FIFO of running spans
+  const keyOf = r => (r.task_id !== undefined ? "id:" + r.task_id : "n:" + r.task + "|" + r.epoch);
+  const laneOf = r => LANE_OVERRIDE[r.event] || (LANE_IDS.has(r.component) ? r.component : "slow");
+  const sum = { events: rows.length, tasks: 0, cancelledTasks: 0, protectedTasks: 0, staleDropped: 0,
+                duplicatesBlocked: 0, writesBlocked: 0, compensations: 0, committed: {},
+                readsRun: 0, readsCached: 0, epochBumps: 0, ackMs: [] };
+  const mark = (r, lane, kind) => marks.push({ t: r.t_ms, lane, kind, epoch: r.epoch, label: r.event, raw: r });
+  let tMax = 0;
+
+  for (const r of rows) {
+    tMax = Math.max(tMax, r.t_ms);
+    switch (r.event) {
+      case "task_started": {
+        const s = { kind: "task", lane: laneOfTask(r.task), label: r.task || "task", epoch: r.epoch,
+                    start: r.t_ms, end: null, state: "running", protected: !!r.protected, raw: { start: r } };
+        spans.push(s); sum.tasks++;
+        const k = keyOf(r); if (!open.has(k)) open.set(k, []); open.get(k).push(s);
+        break;
+      }
+      case "task_finished":
+      case "task_cancelled": {
+        const q = open.get(keyOf(r));
+        let s = q && q.shift();
+        if (!s) {  // trace began mid-task: draw what we know
+          s = { kind: "task", lane: laneOfTask(r.task), label: r.task || "task", epoch: r.epoch,
+                start: r.t_ms, end: null, state: "running", protected: false, raw: {} };
+          spans.push(s);
+        }
+        s.end = r.t_ms; s.raw.end = r;
+        if (r.event === "task_cancelled") { s.state = "cancelled"; s.supersededBy = r.superseded_by; sum.cancelledTasks++; }
+        else s.state = r.ok === false ? "failed" : "done";
+        break;
+      }
+      case "task_protected": {
+        const q = open.get(keyOf(r));
+        if (q && q[0]) q[0].supersededBy = r.superseded_by;
+        mark(r, "coordination", "protect"); sum.protectedTasks++;
+        break;
+      }
+      case "tool_read": {
+        const lat = r.cached ? 0 : Number(r.latency_ms) || 0;
+        if (r.cached) sum.readsCached++; else sum.readsRun++;
+        if (lat > 0.5) {
+          spans.push({ kind: "read", lane: "tools", label: r.tool, epoch: r.epoch, start: Math.max(0, r.t_ms - lat),
+                       end: r.t_ms, state: r.ok === false ? "failed" : "done", raw: { end: r } });
+        } else mark(r, "tools", r.cached ? "cachehit" : "dot");
+        break;
+      }
+      case "classified": {
+        const lat = Number(r.latency_ms) || 0;
+        spans.push({ kind: "classify", lane: "perception", label: String(r.label || "classified"), epoch: r.epoch,
+                     start: Math.max(0, r.t_ms - lat), end: r.t_ms, state: "done", raw: { end: r } });
+        break;
+      }
+      case "ack_sent": {
+        const lat = Number(r.latency_ms) || 0;
+        sum.ackMs.push(lat);
+        spans.push({ kind: "ack", lane: "fast", label: "ack", epoch: r.epoch, start: Math.max(0, r.t_ms - lat),
+                     end: r.t_ms, state: "done", overBudget: lat > ACK_BUDGET_MS, raw: { end: r } });
+        break;
+      }
+      case "epoch_bumped":
+        bumps.push({ t: r.t_ms, epoch: r.epoch, old: r.old_epoch, reason: r.reason, raw: r });
+        mark(r, "coordination", "bump");  // a flag in the Coordination lane, besides the full-height line
+        sum.epochBumps++;
+        break;
+      case "stale_result_dropped": sum.staleDropped++; mark(r, laneOf(r), "stale"); break;
+      case "write_blocked_duplicate": sum.duplicatesBlocked++; mark(r, laneOf(r), "duplicate"); break;
+      case "write_blocked": sum.writesBlocked++; mark(r, laneOf(r), "blocked"); break;
+      case "write_compensated": sum.compensations++; mark(r, laneOf(r), "comp"); break;
+      case "write_committed":
+        sum.committed[r.tool || "?"] = (sum.committed[r.tool || "?"] || 0) + 1;
+        mark(r, laneOf(r), "commit");
+        break;
+      default: mark(r, laneOf(r), MARK_KIND[r.event] || "dot");
+    }
+  }
+  for (const s of spans) {                     // still running at the end of the trace
+    if (s.end === null) { s.end = tMax; s.open = true; }
+    if (s.end < s.start) s.end = s.start;
+  }
+  // Stack overlapping spans into rows within each lane (interval scheduling in the time domain).
+  const lanes = LANES.map(l => {
+    const ends = [];
+    for (const s of spans.filter(x => x.lane === l.id).sort((a, b) => a.start - b.start || a.end - b.end)) {
+      let row = ends.findIndex(e => e <= s.start);
+      if (row < 0) { row = ends.length; ends.push(0); }
+      s.row = row; ends[row] = Math.max(s.end, s.start + 0.5);
+    }
+    return { id: l.id, label: l.label, rows: Math.max(1, ends.length) };
+  });
+  const epochs = [...new Set(rows.map(r => r.epoch).filter(e => typeof e === "number"))].sort((a, b) => a - b);
+  const ack = sum.ackMs;
+  return {
+    sessionId: rows.length ? rows[0].session_id || null : null,
+    lanes, spans, marks, bumps, epochs, tMax: Math.max(tMax, 1),
+    summary: { ...sum, ackMax: ack.length ? Math.max(...ack) : null,
+               ackOverBudget: ack.filter(a => a > ACK_BUDGET_MS).length },
+  };
+}
+</script>
+
+<script id="ui">
+/* ------------------------------------------------------------------------------------------
+   UI: SVG rendering, zoom, tooltips, loading (embedded data, /traces/{id}, or drag & drop).
+   ------------------------------------------------------------------------------------------ */
+window.__CHRONOS_TRACE__ = /*CHRONOS_TRACE_DATA*/null;
+
+(function () {
+  const $ = s => document.querySelector(s);
+  const SVGNS = "http://www.w3.org/2000/svg";
+  const LABEL_W = 116, PADL = 12, PADR = 40, AXIS_H = 48, MARK_H = 18, ROW_H = 17, LANE_PAD = 6;
+  const state = { model: null, ppm: 1, autoFit: true, traceId: null, timer: null, hits: [] };
+
+  const el = (tag, attrs, ...kids) => {
+    const n = document.createElementNS(SVGNS, tag);
+    for (const [k, v] of Object.entries(attrs || {})) if (v !== null && v !== undefined) n.setAttribute(k, v);
+    for (const k of kids) n.appendChild(typeof k === "string" ? document.createTextNode(k) : k);
+    return n;
+  };
+  const eColor = e => `var(--e${(((e | 0) - 1) % 8 + 8) % 8})`;
+  const eIdx = e => (((e | 0) - 1) % 8 + 8) % 8;
+  const fmtT = t => (t >= 1000 ? (t / 1000).toFixed(t % 1000 === 0 ? 0 : 1) + " s" : Math.round(t * 10) / 10 + " ms");
+  const register = obj => { state.hits.push(obj); return state.hits.length - 1; };
+
+  function niceStep(minMs) {
+    for (let mag = 1; mag < 1e9; mag *= 10) for (const m of [1, 2, 5]) if (m * mag >= minMs) return m * mag;
+    return 1e9;
+  }
+
+  function render() {
+    const m = state.model; if (!m) return;
+    state.hits = [];
+    const X = t => PADL + t * state.ppm;
+    const W = Math.ceil(PADL + m.tMax * state.ppm + PADR);
+    let y = AXIS_H; const boxes = [];
+    for (const l of m.lanes) { const h = MARK_H + l.rows * ROW_H + 2 * LANE_PAD; boxes.push({ ...l, y, h }); y += h; }
+    const H = y + 6;
+    const laneBox = Object.fromEntries(boxes.map(b => [b.id, b]));
+
+    const chart = $("#chart"), labels = $("#labels");
+    chart.replaceChildren(); labels.replaceChildren();
+    chart.setAttribute("width", W); chart.setAttribute("height", H);
+    labels.setAttribute("width", LABEL_W); labels.setAttribute("height", H);
+
+    const defs = el("defs");
+    for (let i = 0; i < 8; i++) {
+      defs.appendChild(el("pattern", { id: `hatch${i}`, patternUnits: "userSpaceOnUse", width: 6, height: 6,
+        patternTransform: "rotate(45)" },
+        el("rect", { width: 6, height: 6, style: `fill:var(--e${i});opacity:.16` }),
+        el("line", { x1: 0, y1: 0, x2: 0, y2: 6, style: `stroke:var(--e${i});stroke-width:2.2` })));
+    }
+    chart.appendChild(defs);
+
+    // lane backgrounds + labels
+    boxes.forEach((b, i) => {
+      const bg = { style: i % 2 ? "fill:var(--lane-alt)" : "fill:var(--bg)" };
+      chart.appendChild(el("rect", { x: 0, y: b.y, width: W, height: b.h, ...bg }));
+      labels.appendChild(el("rect", { x: 0, y: b.y, width: LABEL_W, height: b.h, ...bg }));
+      labels.appendChild(el("text", { x: 10, y: b.y + 18, class: "lane-label" }, b.label));
+      chart.appendChild(el("line", { x1: 0, y1: b.y, x2: W, y2: b.y, style: "stroke:var(--line)" }));
+    });
+    labels.appendChild(el("line", { x1: LABEL_W - .5, y1: 0, x2: LABEL_W - .5, y2: H, style: "stroke:var(--line)" }));
+
+    // time axis
+    const step = niceStep(70 / state.ppm), axis = el("g", { class: "axis" });
+    for (let t = 0; t <= m.tMax + step; t += step) {
+      const x = X(t);
+      axis.appendChild(el("line", { x1: x, y1: AXIS_H - 6, x2: x, y2: H, style: "stroke:var(--line)" }));
+      axis.appendChild(el("text", { x: x + 3, y: AXIS_H - 10 }, fmtT(t)));
+    }
+    chart.appendChild(axis);
+
+    // spans
+    for (const s of m.spans) {
+      const b = laneBox[s.lane]; if (!b) continue;
+      const x0 = X(s.start), w = Math.max(X(s.end) - x0, 2.5);
+      const yy = b.y + LANE_PAD + MARK_H + s.row * ROW_H, h = ROW_H - 3;
+      const idx = eIdx(s.epoch), cancelled = s.state === "cancelled";
+      const g = el("g", { class: "hit", "data-i": register({ span: s.label, state: s.state, epoch: s.epoch,
+        lane: s.lane, start_ms: s.start, end_ms: s.end, duration_ms: +(s.end - s.start).toFixed(3),
+        superseded_by_epoch: s.supersededBy, ...s.raw }) });
+      const stroke = s.overBudget || s.state === "failed" ? "var(--bad)" : eColor(s.epoch);
+      g.appendChild(el("rect", { x: x0, y: yy, width: w, height: h, rx: 3,
+        style: cancelled ? `fill:url(#hatch${idx});stroke:${stroke};stroke-dasharray:3 2`
+          : `fill:${eColor(s.epoch)};opacity:${s.kind === "task" ? 0.55 : 0.9};stroke:${stroke};stroke-width:${
+              s.protected || s.overBudget ? 2 : 1}${s.open ? ";stroke-dasharray:4 2" : ""}` }));
+      if (w > 34) {
+        const cid = `c${register({})}`;
+        g.appendChild(el("clipPath", { id: cid }, el("rect", { x: x0, y: yy, width: w, height: h })));
+        g.appendChild(el("text", { x: x0 + 4, y: yy + h - 4, "clip-path": `url(#${cid})`,
+          style: `fill:${cancelled ? "var(--fg)" : "var(--bar-text)"}`,
+          "text-decoration": cancelled ? "line-through" : null }, s.label));
+      }
+      if (cancelled) g.appendChild(el("line", { x1: x0, y1: yy + h / 2, x2: x0 + w, y2: yy + h / 2,
+        style: "stroke:var(--fg);stroke-width:1.4;opacity:.75" }));
+      chart.appendChild(g);
+    }
+
+    // marks
+    for (const k of m.marks) {
+      const b = laneBox[k.lane]; if (!b) continue;
+      const cx = X(k.t), cy = b.y + LANE_PAD + MARK_H / 2, col = eColor(k.epoch);
+      const g = el("g", { class: "hit", "data-i": register(k.raw) });
+      const R = 6;
+      switch (k.kind) {
+        case "duplicate":
+        case "blocked": {
+          g.appendChild(el("circle", { cx, cy, r: R, style: k.kind === "duplicate"
+            ? "fill:var(--bad);stroke:var(--bad)" : "fill:var(--bg);stroke:var(--bad);stroke-width:2" }));
+          const c = k.kind === "duplicate" ? "var(--bg)" : "var(--bad)";
+          g.appendChild(el("path", { d: `M${cx - 3} ${cy - 3}L${cx + 3} ${cy + 3}M${cx + 3} ${cy - 3}L${cx - 3} ${cy + 3}`,
+            style: `stroke:${c};stroke-width:1.8;fill:none` }));
+          break;
+        }
+        case "commit":
+          g.appendChild(el("rect", { x: cx - 5, y: cy - 5, width: 10, height: 10, style: `fill:${col};stroke:var(--fg);stroke-width:1.5` }));
+          break;
+        case "comp":
+          g.appendChild(el("rect", { x: cx - 5, y: cy - 5, width: 10, height: 10, transform: `rotate(45 ${cx} ${cy})`,
+            style: `fill:var(--bg);stroke:${col};stroke-width:2` }));
+          break;
+        case "response":
+          g.appendChild(el("path", { d: `M${cx} ${cy - R}L${cx + R} ${cy}L${cx} ${cy + R}L${cx - R} ${cy}Z`, style: `fill:${col}` }));
+          break;
+        case "stale":  // an output that was discarded: struck-through diamond
+          g.appendChild(el("path", { d: `M${cx} ${cy - R}L${cx + R} ${cy}L${cx} ${cy + R}L${cx - R} ${cy}Z`,
+            style: `fill:url(#hatch${eIdx(k.epoch)});stroke:${col};stroke-dasharray:2 2` }));
+          g.appendChild(el("line", { x1: cx - R - 2, y1: cy, x2: cx + R + 2, y2: cy, style: "stroke:var(--fg);stroke-width:1.6" }));
+          break;
+        case "bump":
+          g.appendChild(el("line", { x1: cx, y1: cy - 7, x2: cx, y2: cy + 7, style: `stroke:${col};stroke-width:2` }));
+          g.appendChild(el("path", { d: `M${cx} ${cy - 7}L${cx + 10} ${cy - 3}L${cx} ${cy + 1}Z`, style: `fill:${col}` }));
+          break;
+        case "protect":
+          g.appendChild(el("path", { d: `M${cx} ${cy - R}L${cx + R} ${cy + R - 1}L${cx - R} ${cy + R - 1}Z`, style: `fill:none;stroke:${col};stroke-width:2` }));
+          break;
+        case "plan":
+          g.appendChild(el("rect", { x: cx - 3.5, y: cy - 3.5, width: 7, height: 7, rx: 1.5, style: `fill:${col};opacity:.85` }));
+          break;
+        case "event":
+          g.appendChild(el("rect", { x: cx - 1.5, y: cy - 6, width: 3, height: 12, style: `fill:${col};opacity:.7` }));
+          break;
+        case "cachehit":
+        case "reuse":
+          g.appendChild(el("circle", { cx, cy, r: 3.5, style: `fill:none;stroke:${col};stroke-width:1.6` }));
+          break;
+        default:
+          g.appendChild(el("circle", { cx, cy, r: 2.8, style: `fill:${col};opacity:.8` }));
+      }
+      chart.appendChild(g);
+    }
+
+    // epoch bumps: labelled vertical lines across every lane
+    m.bumps.forEach((bp, i) => {
+      const x = X(bp.t), col = eColor(bp.epoch);
+      const g = el("g", { class: "hit", "data-i": register(bp.raw) });
+      g.appendChild(el("line", { x1: x, y1: AXIS_H - 4, x2: x, y2: H - 4, style: `stroke:${col};stroke-width:1.8;stroke-dasharray:5 3` }));
+      g.appendChild(el("rect", { x: x - 4, y: AXIS_H - 4, width: 8, height: H - AXIS_H, style: "fill:transparent" }));
+      g.appendChild(el("text", { x: x + 4, y: 11 + (i % 2) * 12, style: `fill:${col};font-weight:600` },
+        `e${bp.old} → e${bp.epoch} · ${bp.reason || "bump"}`));
+      chart.appendChild(g);
+    });
+  }
+
+  function renderHeader() {
+    const m = state.model, s = m.summary;
+    const chip = (html, cls = "") => { const c = document.createElement("span"); c.className = "chip " + cls; c.innerHTML = html; return c; };
+    const esc = t => String(t).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    const box = $("#summary"); box.replaceChildren();
+    box.append(
+      chip(`<b>${s.events}</b> events`),
+      chip(`<b>${s.epochBumps}</b> epoch bumps`),
+      chip(`<b>${s.cancelledTasks}</b> tasks cancelled`),
+      chip(`<b>${s.staleDropped}</b> stale outputs dropped`),
+      chip(`<b>${s.duplicatesBlocked}</b> duplicate writes blocked`, s.duplicatesBlocked ? "bad" : ""),
+      chip(`<b>${s.writesBlocked}</b> writes blocked (epoch/commit gate)`, s.writesBlocked ? "bad" : ""),
+      chip(`<b>${s.compensations}</b> compensations`),
+      chip(`reads <b>${s.readsRun}</b> run / <b>${s.readsCached}</b> cached`),
+      chip("writes committed: " + (Object.keys(s.committed).length
+        ? Object.entries(s.committed).map(([k, v]) => `<b>${esc(k)}</b>×${v}`).join(", ") : "<b>none</b>")),
+      s.ackMax === null ? chip("no acks") : chip(`ack max <b>${fmtT(s.ackMax)}</b> (budget ${ACK_BUDGET_MS} ms)`,
+        s.ackOverBudget ? "bad" : "good"));
+    const eb = $("#epochs"); eb.replaceChildren();
+    for (const e of m.epochs) {
+      const c = chip(`<span class="sw" style="background:${eColor(e)}"></span> epoch <b>${e}</b>`);
+      eb.appendChild(c);
+    }
+    $("#sub").textContent = (m.sessionId ? `session ${m.sessionId} · ` : "") +
+      `${fmtT(m.tMax)} · X axis = ms since session start · colour = epoch`;
+    $("#legend").innerHTML =
+      "<span>Hatched + struck-through bar = cancelled work</span>" +
+      "<span>● red ✕ = duplicate write blocked</span><span>○ red ✕ = write blocked by epoch/commit gate</span>" +
+      "<span>■ = write committed</span><span>◇ = write compensated</span>" +
+      "<span>◆ = response sent</span><span>hatched ◇ with a line = stale output dropped</span>" +
+      "<span>△ = in-flight write protected from cancellation</span>" +
+      "<span>dashed vertical line + ⚑ flag = epoch bump</span>" +
+      "<span>red outline on an ack = over the 300 ms budget</span>";
+  }
+
+  function fit() {
+    if (!state.model) return;
+    const avail = $("#scroll").clientWidth - LABEL_W - PADL - PADR;
+    state.ppm = Math.min(200, Math.max(0.005, avail / state.model.tMax));
+  }
+  // `vp` = x of the zoom anchor measured from the left edge of the scroll container. The chart
+  // starts LABEL_W px into the scrolled content (the sticky label column is first), so keep the
+  // time under the anchor fixed: chartX = vp + scrollLeft - LABEL_W; t = (chartX - PADL) / ppm.
+  function zoom(f, vp) {
+    state.autoFit = false;
+    const sc = $("#scroll");
+    const anchor = vp ?? sc.clientWidth / 2;
+    const t = (anchor + sc.scrollLeft - LABEL_W - PADL) / state.ppm;
+    state.ppm = Math.min(200, Math.max(0.005, state.ppm * f));
+    render();
+    sc.scrollLeft = LABEL_W + PADL + t * state.ppm - anchor;
+  }
+
+  function show(model, label) {
+    state.model = model;
+    $("#empty").style.display = "none"; $("#scroll").style.display = "flex";
+    if (state.autoFit) fit();
+    renderHeader(); render();
+    $("#src").textContent = label || "";
+  }
+  function loadText(text, label) {
+    const { rows, bad } = parseJsonl(text);
+    const w = $("#warn");
+    w.style.display = bad ? "block" : "none";
+    w.textContent = bad ? `${bad} line(s) were not valid JSON and were skipped.` : "";
+    if (!rows.length) { $("#scroll").style.display = "none"; $("#empty").style.display = "block"; return; }
+    show(buildModel(rows), label);
+  }
+
+  async function fetchTrace() {
+    try {
+      const r = await fetch(`/traces/${encodeURIComponent(state.traceId)}`, { cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      loadText(await r.text(), `/traces/${state.traceId}`);
+    } catch (e) { $("#src").textContent = "could not load trace: " + e.message; }
+  }
+  function setLive(on) {
+    clearInterval(state.timer);
+    if (on) state.timer = setInterval(fetchTrace, 1000);
+    $("#live").checked = on;
+  }
+
+  // ---- interaction -------------------------------------------------------------------
+  const tip = $("#tip");
+  $("#chart").addEventListener("mousemove", ev => {
+    const n = ev.target.closest && ev.target.closest("[data-i]");
+    const obj = n && state.hits[+n.getAttribute("data-i")];
+    if (!obj || !Object.keys(obj).length) { tip.style.display = "none"; return; }
+    tip.textContent = JSON.stringify(obj, null, 2).slice(0, 4000);
+    tip.style.display = "block";
+    const pad = 14, r = tip.getBoundingClientRect();
+    tip.style.left = Math.min(ev.clientX + pad, innerWidth - r.width - 8) + "px";
+    tip.style.top = Math.min(ev.clientY + pad, innerHeight - r.height - 8) + "px";
+  });
+  $("#chart").addEventListener("mouseleave", () => { tip.style.display = "none"; });
+  $("#zin").onclick = () => zoom(1.6); $("#zout").onclick = () => zoom(1 / 1.6);
+  $("#fit").onclick = () => { state.autoFit = true; fit(); render(); $("#scroll").scrollLeft = 0; };
+  $("#scroll").addEventListener("wheel", ev => {
+    if (!(ev.ctrlKey || ev.shiftKey || ev.altKey)) return;
+    ev.preventDefault();
+    zoom(ev.deltaY < 0 ? 1.25 : 0.8, ev.clientX - $("#scroll").getBoundingClientRect().left);
+  }, { passive: false });
+  addEventListener("resize", () => { if (state.autoFit && state.model) { fit(); render(); } });
+  $("#live").onchange = ev => setLive(ev.target.checked);
+  $("#file").onchange = async ev => {
+    const f = ev.target.files[0]; if (f) { state.autoFit = true; loadText(await f.text(), f.name); }
+  };
+  let dragDepth = 0;
+  addEventListener("dragenter", ev => { ev.preventDefault(); dragDepth++; $("#drop").style.display = "flex"; });
+  addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; $("#drop").style.display = "none"; } });
+  addEventListener("dragover", ev => ev.preventDefault());
+  addEventListener("drop", async ev => {
+    ev.preventDefault(); dragDepth = 0; $("#drop").style.display = "none";
+    const f = ev.dataTransfer && ev.dataTransfer.files[0];
+    if (f) { state.autoFit = true; loadText(await f.text(), f.name); }
+  });
+
+  // ---- boot: embedded data > /traces/{id}/view URL > drag & drop --------------------------
+  (async function boot() {
+    const emb = window.__CHRONOS_TRACE__;
+    if (emb) { show(buildModel(Array.isArray(emb) ? emb : parseJsonl(emb).rows), "embedded trace"); return; }
+    const m = location.pathname.match(/\/traces\/([^/]+)\/view/);
+    if (m) {
+      state.traceId = decodeURIComponent(m[1]);
+      $("#livewrap").style.display = "inline";
+      await fetchTrace();
+      if (/[?&]live=1/.test(location.search)) setLive(true);
+      return;
+    }
+    $("#empty").style.display = "block";
+  })();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+name: incar
+title: "In-car: change of goal while the route is being calculated"
+description: >
+  The old route task is cancelled (epoch 1), the new one is planned (epoch 2),
+  and exactly one set_navigation is live at the end.
+tool_latency_ms: [120, 320]
+steps:
+  - say: "Navigate to Chennai Airport"
+  - wait: 80
+  - say: "Actually, gas station first"
+expect:
+  epoch: 2
+  live: {navigation: 1, bookings: 0, reservations: 0}

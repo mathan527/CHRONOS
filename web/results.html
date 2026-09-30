@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CHRONOS results</title>
+<meta name="description" content="Measured benchmark: CHRONOS against a half-duplex baseline over 200 interrupted scenarios.">
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+<header class="hero wrap">
+  <div class="eyebrow">Benchmark</div>
+  <h1>Measured, not hardcoded.</h1>
+  <p class="lede">Every figure on this page is read from <code>bench/results.json</code>, written by <code>python -m bench.run</code>. Re-run the harness and this page changes.</p>
+</header>
+
+<main>
+<section>
+  <div class="wrap">
+    <div class="note" id="meta">Loading results…</div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Correctness under interruption</h2>
+    <div class="legend"><span><i style="background:var(--e4)"></i>CHRONOS</span><span><i style="background:var(--e3)"></i>Baseline</span></div>
+    <div class="bars" id="bars"></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Full comparison</h2>
+    <div class="tablewrap"><table id="cmp"><thead><tr><th>Metric</th><th>CHRONOS</th><th>Baseline</th></tr></thead><tbody></tbody></table></div>
+    <p style="margin-top:1rem">Brackets are 95% Wilson intervals. “Baseline” is a plain listen-think-act agent with no epochs, fencing or ledger.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Read this before quoting the numbers</h2>
+    <div class="grid g2">
+      <div class="card"><h3>Mock LLM</h3><p>Timings use the deterministic mock LLM and mock tools (20–120 ms latency), so they reflect the coordination logic, not model speed. Time to first response is the template fast path.</p></div>
+      <div class="card"><h3>Ollama pass</h3><p id="ollama">–</p></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer><div class="wrap">Method, scenario mix and hardware are recorded in <code>bench/results.md</code>.</div></footer>
+<script src="/assets/site.js"></script>
+<script src="/assets/results.js"></script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+# docker compose up            -> Ollama + model pull + CHRONOS on http://localhost:8000
+# docker compose --profile mock up chronos-mock   -> no Ollama, no models, no GPU (mock LLM)
+services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-models:/root/.ollama
+    ports:
+      - "11434:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    # GPU (optional, NVIDIA): uncomment.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{driver: nvidia, count: all, capabilities: [gpu]}]
+
+  # One-shot: pulls the two models into the shared volume, then exits.
+  ollama-init:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c", "ollama pull llama3.2:3b && ollama pull moondream"]
+    restart: "no"
+
+  chronos:
+    build: .
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      CHRONOS_LLM: ollama
+    ports:
+      - "8000:8000"
+    volumes:
+      - chronos-data:/data
+    restart: unless-stopped
+
+  # Mock mode: deterministic rule-based LLM, nothing to download.
+  chronos-mock:
+    profiles: ["mock"]
+    build: .
+    environment:
+      CHRONOS_LLM: mock
+    ports:
+      - "8000:8000"
+    volumes:
+      - chronos-data:/data
+
+volumes:
+  ollama-models:
+  chronos-data:

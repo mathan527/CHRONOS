@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CHRONOS · the agent you can interrupt</title>
+<meta name="description" content="CHRONOS is a real-time AI agent that stays correct when you interrupt it: reads speculate, writes commit, every change is a new epoch.">
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+
+<header class="hero wrap">
+  <div class="eyebrow">Samsung PRISM GenAI Hackathon · Theme 05</div>
+  <h1>The voice agent you can<br>interrupt mid-sentence.</h1>
+  <p class="lede">Today's assistants listen, think, speak, then act, one step at a time. Say “Wait, make it the 6pm flight” and they ignore you, freeze, or book both. CHRONOS treats every interruption as a new version of the plan, so stale work is cancelled and nothing is booked twice.</p>
+  <div class="actions">
+    <a class="cta" href="/demo">Try the live demo</a>
+    <a class="btn ghost" href="/how-it-works">How it works</a>
+    <a class="btn ghost" href="/results">See the measured results</a>
+  </div>
+</header>
+
+<main>
+<section>
+  <div class="wrap grid g2" style="align-items:center">
+    <div>
+      <div class="eyebrow">The core idea</div>
+      <h2>Reads can be speculative. Writes must be committed.</h2>
+      <p>While you are still talking, CHRONOS already searches flights and plans routes: those reads are safe to throw away. Anything that changes the world (booking, navigation, payment) waits until you have finished, and is re-checked against the current epoch right before it runs.</p>
+      <p>Interrupt, and the epoch moves on. Old tasks are cancelled, late results are dropped, and a booking that already went through is undone by a compensating action.</p>
+    </div>
+    <figure class="clip" style="margin:0" aria-label="Animation: the 8pm booking is struck through when the user says 6pm, and a new epoch books once">
+      <svg viewBox="0 0 440 250" role="img">
+        <text class="dim" x="10" y="18">time →</text>
+        <text class="say" x="10" y="48">“Book the 8pm flight to Delhi”</text>
+        <text class="dim" x="10" y="86">epoch 1</text>
+        <rect class="bar b-old" x="70" y="72" width="170" height="22"/>
+        <text x="78" y="87">search + plan 8pm</text>
+        <line class="strike" x1="70" y1="83" x2="240" y2="83"/>
+        <g class="bump">
+          <line x1="240" y1="58" x2="240" y2="220" stroke="#d9a441" stroke-width="2" stroke-dasharray="4 4"/>
+          <text class="say" x="250" y="48">“Wait, make it 6pm”</text>
+        </g>
+        <text class="dim" x="10" y="136">epoch 2</text>
+        <rect class="bar b-new" x="246" y="122" width="100" height="22"/>
+        <text x="254" y="137" style="fill:#1b2838">patch plan</text>
+        <rect class="bar b-write" x="350" y="122" width="80" height="22"/>
+        <text x="358" y="137" style="fill:#1b2838">book 6pm</text>
+        <text class="caption" x="10" y="200" style="fill:#aec790">✓ one booking · one charge · the 8pm write never ran</text>
+        <text class="dim caption" x="10" y="222">(illustration of the mechanism; real sessions are on the Timeline page)</text>
+      </svg>
+    </figure>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="eyebrow">Measured, not claimed</div>
+    <h2>What 200 interrupted scenarios showed</h2>
+    <p>Same scenarios, same mock tools, CHRONOS against a plain half-duplex baseline. Numbers load from the benchmark output on this machine.</p>
+    <div class="grid g4" id="home-stats">
+      <div class="card stat"><div class="num" data-stat="ttfr_chronos">–</div><div class="lbl">median time to first response (CHRONOS) vs <b data-stat="ttfr_baseline">–</b> baseline</div></div>
+      <div class="card stat"><div class="num" data-stat="cons_chronos">–</div><div class="lbl">runs ending in the state the user actually asked for (baseline: <b data-stat="cons_baseline">–</b>)</div></div>
+      <div class="card stat"><div class="num" data-stat="dup_chronos">–</div><div class="lbl">duplicate live writes (baseline: <b data-stat="dup_baseline">–</b> of 200 runs)</div></div>
+      <div class="card stat"><div class="num" data-stat="dc_chronos">–</div><div class="lbl">double charges (baseline: <b data-stat="dc_baseline">–</b> of 200 runs)</div></div>
+    </div>
+    <p class="note" style="margin-top:1rem">Measured with the deterministic mock LLM so results are reproducible without a GPU. Ollama (Llama 3.2 3B, Moondream) was not reachable when this run was taken. <a href="/results">Full method and caveats →</a></p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="eyebrow">Where it matters</div>
+    <h2>Four situations, one mechanism</h2>
+    <div class="grid g2">
+      <div class="card"><h3>In the car</h3><p>“Navigate to Chennai Airport… actually, gas station first.” One route is set, the old one is cancelled.</p></div>
+      <div class="card"><h3>Customer support</h3><p>“Book a flight to Delhi tomorrow… next week instead.” No double booking or charge; a booking already made is refunded.</p></div>
+      <div class="card"><h3>Field troubleshooting</h3><p>Send a camera frame and ask what is wrong. The diagnosis is grounded in what the camera sees and a knowledge base.</p></div>
+      <div class="card"><h3>Accessibility</h3><p>“I want to boo… um… book a table for four.” Hesitation is not acted on, and self-corrections patch the task.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap" style="text-align:center">
+    <h2>See it survive an interruption</h2>
+    <p style="margin-inline:auto">Run a scenario in the live console, then open its trace to see exactly which work was cancelled.</p>
+    <div class="hero actions" style="justify-content:center;padding:0;margin-top:1rem">
+      <a class="cta" href="/demo">Open the live demo</a>
+      <a class="btn ghost" href="/timeline">Open the timeline</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer><div class="wrap">CHRONOS · Python 3.11, asyncio, FastAPI, Pydantic v2, SQLite · runs fully on-device with local models.</div></footer>
+
+<script src="/assets/site.js"></script>
+<script src="/assets/results.js"></script>
+</body>
+</html>

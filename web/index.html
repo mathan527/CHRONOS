@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CHRONOS · interruptible agent</title>
+<meta name="description" content="CHRONOS demo: an interruptible real-time agent. Reads speculate, writes commit, every interruption is a new epoch.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%235b9dff' stroke-width='3'/%3E%3Cpath d='M16 8v8l5 3' fill='none' stroke='%23a58bff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+
+<!-- icon sprite: every status/tool icon is inline SVG, so the page works fully offline -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-plane" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></symbol>
+    <symbol id="i-route" viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"/></symbol>
+    <symbol id="i-table" viewBox="0 0 24 24"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></symbol>
+    <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></symbol>
+    <symbol id="i-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></symbol>
+    <symbol id="i-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="currentColor"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><polygon points="7 4 20 12 7 20 7 4" fill="currentColor"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+    <symbol id="i-present" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+    <symbol id="i-logo" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12.5" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M16 8.5V16l5 3.2" fill="none" stroke="var(--e2)" stroke-width="2.6" stroke-linecap="round"/><path d="M27 6.5 29.5 4M27 6.5l-3.6-.3" fill="none" stroke="var(--e1)" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#feed">Skip to conversation</a>
+
+<header id="top">
+  <div class="brand">
+    <svg class="logo" aria-hidden="true"><use href="#i-logo"/></svg>
+    <div>
+      <div class="wordmark">CHRONOS</div>
+      <div class="tagline">reads speculate · writes commit · every change is an epoch</div>
+    </div>
+  </div>
+
+  <div class="sess" role="group" aria-label="Session">
+    <span class="label">session</span>
+    <code id="sid" title="Session id">–</code>
+    <button id="copy" class="icon-btn" aria-label="Copy session id" title="Copy session id"><svg class="ic"><use href="#i-copy"/></svg></button>
+    <button id="newsess" class="btn sm"><svg class="ic"><use href="#i-plus"/></svg>New session <kbd>N</kbd></button>
+  </div>
+
+  <div class="pills" role="status" aria-label="Connection status">
+    <span class="pill" id="pill-ws"><i class="dot"></i><span class="t">connecting…</span></span>
+    <span class="pill" id="pill-llm"><i class="dot"></i><span class="t">LLM –</span></span>
+    <span class="pill" id="pill-llama"><i class="dot"></i><span class="t">llama3.2:3b</span></span>
+    <span class="pill" id="pill-moon"><i class="dot"></i><span class="t">moondream</span></span>
+  </div>
+
+  <div class="tools">
+    <a class="link" href="/">Home</a>
+    <a id="trace-link" class="link" href="#" target="_blank" rel="noopener">Trace timeline<svg class="ic"><use href="#i-external"/></svg></a>
+    <a id="state-link" class="link" href="#" target="_blank" rel="noopener">State JSON<svg class="ic"><use href="#i-external"/></svg></a>
+    <button id="present" class="btn sm toggle" aria-pressed="false" title="Presenter mode (P)"><svg class="ic"><use href="#i-present"/></svg>Present</button>
+    <button id="theme" class="icon-btn" aria-label="Switch to light theme" title="Toggle theme (T)"><svg class="ic"><use href="#i-sun"/></svg></button>
+  </div>
+</header>
+
+<section id="metrics" aria-label="Live metrics">
+  <div class="metric" id="m-epoch"><span class="k">Epoch</span><span class="v" data-v>–</span></div>
+  <div class="metric" id="m-ack"><span class="k">Last ack</span><span class="v" data-v>–</span><span class="sub" data-sub>target &lt; 300 ms</span></div>
+  <div class="metric" id="m-p50"><span class="k">p50 ack</span><span class="v" data-v>–</span><span class="sub" data-sub>&nbsp;</span></div>
+  <div class="metric" id="m-stale"><span class="k">Stale dropped</span><span class="v" data-v>0</span><span class="sub">never emitted</span></div>
+  <div class="metric" id="m-dup"><span class="k">Duplicate writes blocked</span><span class="v" data-v>0</span><span class="sub">idempotency ledger</span></div>
+  <div class="metric" id="m-commit"><span class="k">Writes committed</span><span class="v" data-v>0</span><span class="sub">fenced + ledgered</span></div>
+  <div class="metric" id="m-comp"><span class="k">Compensations</span><span class="v" data-v>0</span><span class="sub">stale writes undone</span></div>
+</section>
+
+<main>
+  <!-- ============================================================ controls ============ -->
+  <div class="col" id="col-left" aria-label="Controls">
+    <section class="card" id="talk">
+      <h2>Talk</h2>
+      <div class="live" id="live" aria-live="off">
+        <div class="live-head"><span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="live-state">idle</span></div>
+        <div class="live-text" id="live-text">Type below or press a scenario.</div>
+      </div>
+      <div class="input-row">
+        <input id="utt" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. Book a flight to Delhi tomorrow" aria-label="What do you want to say?">
+        <button id="send" class="btn primary">Send <kbd>↵</kbd></button>
+      </div>
+      <div class="opts">
+        <label class="check" title="Words stream as partial transcripts, so the agent starts reading before you finish"><input id="sim" type="checkbox" checked> Simulate speech</label>
+        <label class="check" title="Untick to send partials only; the server commits after a short silence"><input id="withfinal" type="checkbox" checked> Send final</label>
+      </div>
+      <label class="range">Speed <input id="speed" type="range" min="40" max="600" value="220" aria-label="Milliseconds per word"> <output id="speed-v">220 ms/word</output></label>
+      <button id="interrupt" class="btn interrupt" title="Barge in: cancel whatever the agent is doing (Esc)">
+        <svg class="ic"><use href="#i-stop"/></svg><span>Interrupt</span><kbd>Esc</kbd>
+      </button>
+    </section>
+
+    <section class="card" id="camera" aria-label="Camera">
+      <h2>Camera</h2>
+      <div class="camrow">
+      <label class="drop" id="drop" for="img" tabindex="0">
+        <svg class="ic lg"><use href="#i-camera"/></svg>
+        <span><b>Drop</b> image<br>or click</span>
+        <input id="img" type="file" accept="image/*" hidden>
+      </label>
+      <div class="samples" role="group" aria-label="Sample camera frames">
+        <button class="sample" data-sample="panel_disconnected_cable.png"><img src="/samples/panel_disconnected_cable.png" alt="" loading="lazy"><span>Loose cable</span></button>
+        <button class="sample" data-sample="machine_overheating_fan.png"><img src="/samples/machine_overheating_fan.png" alt="" loading="lazy"><span>Stopped fan</span></button>
+        <button class="sample" data-sample="breaker_tripped.png"><img src="/samples/breaker_tripped.png" alt="" loading="lazy"><span>Tripped breaker</span></button>
+      </div>
+      </div>
+      <p class="hint" id="cam-hint">No question typed? CHRONOS asks <i>“What's wrong with this?”</i></p>
+    </section>
+
+    <section class="card" id="scenarios">
+      <h2>Scenarios <button id="playall" class="btn sm" title="Play all five, one fresh session each"><svg class="ic"><use href="#i-play"/></svg>Play all</button></h2>
+      <div id="scn-list"></div>
+    </section>
+
+  </div>
+
+  <!-- ========================================================= conversation =========== -->
+  <section class="col" id="col-feed" aria-label="Conversation">
+    <div class="col-head">
+      <h2>Conversation <span class="sub">grouped by epoch</span></h2>
+      <div class="epoch-key" aria-hidden="true"><i style="--ec:var(--e1)">1</i><i style="--ec:var(--e2)">2</i><i style="--ec:var(--e3)">3</i><i style="--ec:var(--e4)">4</i></div>
+      <button id="clear" class="btn sm ghost">Clear</button>
+    </div>
+    <div id="banner" hidden></div>
+    <div id="feed" role="log" aria-live="polite" aria-relevant="additions" tabindex="-1">
+      <div id="empty" class="empty">
+        <svg class="ic xl"><use href="#i-logo"/></svg>
+        <h3>Try a scenario or type a request</h3>
+        <p>Say something, then <b>change your mind</b> while CHRONOS is working. Watch the epoch divider appear, the old work get struck through, and the agent brain on the right update.</p>
+      </div>
+    </div>
+    <button id="jump" class="jump" hidden><svg class="ic"><use href="#i-down"/></svg>Jump to latest</button>
+    <p class="shortcuts" aria-label="Keyboard shortcuts">
+      <kbd>Enter</kbd> send · <kbd>Esc</kbd> interrupt · <kbd>1</kbd>–<kbd>5</kbd> scenarios · <kbd>N</kbd> new session · <kbd>T</kbd> theme · <kbd>P</kbd> presenter
+    </p>
+  </section>
+
+  <!-- ========================================================== agent brain =========== -->
+  <div class="col" id="col-brain" aria-label="Agent brain">
+    <section class="card">
+      <h2>Agent brain <span class="sub">live internals</span></h2>
+
+      <h3 class="bh">Epochs</h3>
+      <ol id="epoch-rail" class="rail"><li class="none">No epochs yet</li></ol>
+
+      <h3 class="bh">Current plan <span id="plan-meta" class="sub"></span></h3>
+      <div id="plan"><p class="none">No plan yet</p></div>
+
+      <h3 class="bh">In-flight tool calls</h3>
+      <ul id="inflight" class="list"><li class="none">Nothing running</li></ul>
+
+      <h3 class="bh">Idempotency ledger <span class="sub">sha256(session+tool+args)</span></h3>
+      <ul id="ledger" class="list"><li class="none">No writes yet</li></ul>
+
+      <h3 class="bh">State snapshot <span id="snap-epoch" class="sub"></span></h3>
+      <div id="slots" class="chips"><span class="none">No slots yet</span></div>
+    </section>
+  </div>
+</main>
+
+<div id="caption" hidden aria-live="polite"><span class="cap-step" id="cap-step"></span><span id="cap-text"></span></div>
+
+<footer id="strip" aria-label="Live timeline">
+  <div class="strip-head">
+    <h2>Live timeline</h2>
+    <span class="legend" id="tl-legend" aria-hidden="true"></span>
+    <span class="grow"></span>
+    <span class="hint">struck-through hatched bars = cancelled work</span>
+    <a id="tl-link" class="link" href="#" target="_blank" rel="noopener">Open full timeline<svg class="ic"><use href="#i-external"/></svg></a>
+  </div>
+  <div class="tl-wrap"><canvas id="tl" role="img" aria-label="Live swim-lane timeline of perception, fast path, slow path, coordination and tool events, coloured by epoch"></canvas></div>
+</footer>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="/assets/app.js"></script>
+</body>
+</html>

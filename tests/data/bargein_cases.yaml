@@ -1,0 +1,150 @@
+# Labelled barge-in utterances: what a user says WHILE the agent is busy.
+# label: correction | goal_change | addition | cancel | backchannel | hesitation | clarification_question
+# final: false => a streaming partial transcript (default true)
+# context: intent the agent is currently working on (optional)
+# Includes Indian-English phrasing (na / only / yaar / haan / achha / theek hai) and self-corrections.
+
+# ------------------------------------------------------------------ correction
+- {text: "make it 6pm", label: correction, context: book_flight}
+- {text: "Wait! Make it the 6pm flight!", label: correction, context: book_flight}
+- {text: "change it to next week", label: correction, context: book_flight}
+- {text: "actually, next week instead", label: correction, context: book_flight}
+- {text: "no, not tomorrow, make it Friday", label: correction, context: book_flight}
+- {text: "sorry, I meant Mumbai", label: correction, context: book_flight}
+- {text: "can you make it seven pm", label: correction, context: book_flight}
+- {text: "make it six pm only", label: correction, context: book_flight}
+- {text: "change the time to 9 am na", label: correction, context: book_flight}
+- {text: "I said 4 people, not 2", label: correction, context: reserve_table}
+- {text: "make it for six", label: correction, context: reserve_table}
+- {text: "it should be Saturday", label: correction, context: reserve_table}
+- {text: "not 8pm, 9pm", label: correction, context: reserve_table}
+- {text: "actually 5 people", label: correction, context: reserve_table}
+- {text: "switch it to the evening one, 8pm", label: correction, context: book_flight}
+- {text: "arre nahi, make it 6 pm yaar", label: correction, context: book_flight}
+- {text: "on second thought, make it tomorrow", label: correction, context: book_flight}
+- {text: "move it to the day after tomorrow", label: correction, context: book_flight}
+- {text: "change the date to 12 October", label: correction, context: book_flight}
+- {text: "let's make it 7:30 pm", label: correction, context: reserve_table}
+- {text: "rather 10 am", label: correction, context: book_flight}
+- {text: "no wait, it's for three not four", label: correction, context: reserve_table}
+- {text: "change the destination to Bengaluru", label: correction, context: book_flight}
+- {text: "actually I want the aisle seat, not window", label: correction, context: book_flight}
+
+# ------------------------------------------------------------------ goal_change
+- {text: "actually, gas station first", label: goal_change, context: navigate}
+- {text: "wait, stop at the petrol bunker first", label: goal_change, context: navigate}
+- {text: "before that I need petrol", label: goal_change, context: navigate}
+# (swapping the destination of the current navigation is a parameter change => correction)
+- {text: "actually take me home instead of the airport", label: correction, context: navigate}
+- {text: "forget the flight, book me a table for two", label: goal_change, context: book_flight}
+- {text: "actually let's find a restaurant first", label: goal_change, context: navigate}
+- {text: "pharmacy first please", label: goal_change, context: navigate}
+- {text: "actually navigate to Marina Beach", label: goal_change, context: book_flight}
+- {text: "hold on, ATM first", label: goal_change, context: navigate}
+- {text: "new plan, book a flight to Delhi", label: goal_change, context: navigate}
+- {text: "actually, what's wrong with this machine", label: goal_change, context: navigate}
+- {text: "let's go to the office first", label: goal_change, context: navigate}
+- {text: "instead of that, reserve a table for four", label: goal_change, context: book_flight}
+- {text: "oh, I need fuel first yaar", label: goal_change, context: navigate}
+- {text: "actually, reserve a table for 3", label: goal_change}
+
+# ------------------------------------------------------------------ addition
+- {text: "and add a window seat", label: addition}
+- {text: "also add an aisle seat", label: addition}
+- {text: "and one more thing, vegetarian meal", label: addition}
+- {text: "plus a stop at the pharmacy", label: addition}
+- {text: "and also a baby seat for the table", label: addition}
+- {text: "oh and add extra luggage", label: addition}
+- {text: "add a window seat too", label: addition}
+- {text: "one more thing, a wheelchair please", label: addition}
+- {text: "and with a window seat", label: addition}
+- {text: "also please add a stop at the ATM", label: addition}
+- {text: "and one more person", label: addition}
+- {text: "and a table near the window as well", label: addition}
+- {text: "also add non-veg for the meal", label: addition}
+- {text: "aur ek window seat add karo", label: addition}
+
+# ------------------------------------------------------------------ cancel
+- {text: "stop", label: cancel}
+- {text: "stop stop stop", label: cancel}
+- {text: "never mind", label: cancel}
+- {text: "nevermind", label: cancel}
+- {text: "forget it", label: cancel}
+- {text: "cancel that", label: cancel}
+- {text: "cancel my booking", label: cancel}
+- {text: "please stop", label: cancel}
+- {text: "no, don't do that", label: cancel}
+- {text: "scrap that", label: cancel}
+- {text: "abort", label: cancel}
+- {text: "wait, cancel it", label: cancel}
+- {text: "leave it, I'll do it later", label: cancel}
+- {text: "stop it right now", label: cancel}
+- {text: "ruko ruko", label: cancel}
+- {text: "rehne do, forget it", label: cancel}
+- {text: "don't book anything", label: cancel}
+- {text: "cancel the reservation", label: cancel}
+- {text: "no need, never mind", label: cancel}
+
+# ------------------------------------------------------------------ backchannel
+- {text: "uh-huh", label: backchannel}
+- {text: "okay", label: backchannel}
+- {text: "ok ok", label: backchannel}
+- {text: "yeah", label: backchannel}
+- {text: "mm-hmm", label: backchannel}
+- {text: "right", label: backchannel}
+- {text: "haan", label: backchannel}
+- {text: "achha", label: backchannel}
+- {text: "theek hai", label: backchannel}
+- {text: "haan haan okay", label: backchannel}
+- {text: "I see", label: backchannel}
+- {text: "got it", label: backchannel}
+- {text: "sure", label: backchannel}
+- {text: "hmm okay", label: backchannel}
+- {text: "acha acha", label: backchannel}
+- {text: "yes yes", label: backchannel}
+- {text: "alright", label: backchannel}
+- {text: "ji", label: backchannel}
+- {text: "cool", label: backchannel}
+- {text: "okay, fine", label: backchannel}
+
+# ------------------------------------------------------------------ hesitation
+- {text: "I want to boo...", label: hesitation, final: false}
+- {text: "um", label: hesitation}
+- {text: "uh...", label: hesitation}
+- {text: "I want to book a", label: hesitation, final: false}
+- {text: "hmm", label: hesitation}
+- {text: "I want to", label: hesitation}
+- {text: "let me think", label: hesitation}
+- {text: "book a table for", label: hesitation, final: false}
+- {text: "um, actually...", label: hesitation, final: false}
+- {text: "how do I say", label: hesitation}
+- {text: "I want to boo", label: hesitation, final: false}
+- {text: "book a flight to um", label: hesitation, final: false}
+- {text: "one second", label: hesitation}
+- {text: "so...", label: hesitation}
+- {text: "book a tab", label: hesitation, final: false}
+- {text: "I would like to reserve a...", label: hesitation, final: false}
+- {text: "uhh", label: hesitation}
+- {text: "wait", label: hesitation}
+- {text: "errr", label: hesitation}
+- {text: "navigate to the", label: hesitation, final: false}
+- {text: "ek minute", label: hesitation}
+- {text: "and then, um", label: hesitation, final: false}
+
+# ------------------------------------------------------------------ clarification_question
+- {text: "what time does it leave?", label: clarification_question}
+- {text: "which flight did you pick?", label: clarification_question}
+- {text: "how much is that?", label: clarification_question}
+- {text: "is it a direct flight?", label: clarification_question}
+- {text: "where is the gas station?", label: clarification_question}
+- {text: "what is the price no?", label: clarification_question}
+- {text: "how long will the route take", label: clarification_question}
+- {text: "are you sure about that?", label: clarification_question}
+- {text: "which restaurant is it?", label: clarification_question}
+- {text: "why did you choose that one", label: clarification_question}
+- {text: "does it include baggage?", label: clarification_question}
+- {text: "kitna time lagega?", label: clarification_question}
+- {text: "what did you just book?", label: clarification_question}
+- {text: "can you tell me the fare?", label: clarification_question}
+- {text: "did you already charge me?", label: clarification_question}
+- {text: "how far is the airport", label: clarification_question}

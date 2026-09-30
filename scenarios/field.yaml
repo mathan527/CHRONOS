@@ -1,0 +1,12 @@
+name: field
+title: "Field troubleshooting: camera frame + question"
+description: >
+  Moondream describes the frame, the LLM diagnoses using the knowledge-base read
+  tool, and the answer is grounded in what the camera sees.
+tool_latency_ms: [120, 320]
+steps:
+  - frame: images/machine_overheating_fan.png
+    text: "What is wrong with this machine?"
+expect:
+  epoch: 1
+  live: {bookings: 0, navigation: 0, reservations: 0}
