@@ -12,6 +12,8 @@
 > plan, and books **once**. Across 200 randomised interruption scenarios (mock LLM) it left
 > **0 duplicate bookings and 0 double charges**, where a plain half-duplex agent double-booked in 9% of them.
 
+**[▶ Watch the prototype demo video](https://drive.google.com/file/d/1XQ9rK0M7CXhwdTMsQRwWkcw7XGgWG09d/view?usp=sharing)**
+
 ![CHRONOS live console: a booking made in epoch 1 is cancelled by a compensating action after the user corrects it in epoch 2](docs/screenshots/support_after-dark.png)
 
 *The live console in mock-LLM mode: the first booking had already committed, the correction bumps the
