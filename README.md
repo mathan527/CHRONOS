@@ -24,7 +24,7 @@ epoch, the stale booking is refunded by a compensating action, and exactly one n
 | Item | Status | Where |
 |---|---|---|
 | Source code | ✅ | this repository: [chronos/](chronos/), [bench/](bench/), [scenarios/](scenarios/), [web/](web/), [tests/](tests/) |
-| Presentation | ✅ | [presentation/presentation.pptx](presentation/presentation.pptx) |
+| Presentation | ✅ | [📑 View the presentation](https://docs.google.com/presentation/d/1AO4OCg_UlFEtpF4ghjwjVGIjB4VCj5yj/edit?usp=sharing&ouid=114681646465661903742&rtpof=true&sd=true) · file copy: [presentation/presentation.pptx](presentation/presentation.pptx) |
 | Video | ✅ | [▶ Watch the prototype demo video](https://drive.google.com/file/d/1XQ9rK0M7CXhwdTMsQRwWkcw7XGgWG09d/view?usp=sharing) |
 | AI disclosure | ✅ | [AI_DISCLOSURE.md](AI_DISCLOSURE.md) |
 | README | ✅ | this file |
